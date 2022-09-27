@@ -3,14 +3,13 @@ fn main() {
 }
 
 pub fn serialize_moves(moves: Vec<u32>, size: u32) -> String {
-    let mut exported_moves = String::new();
-    for m in moves {
-        exported_moves.push(char::from_u32(m % size + 97).unwrap());
-        exported_moves.push_str(&(m / size + 1).to_string());
-        exported_moves.push(' ');
-    }
-    exported_moves.remove(exported_moves.len() - 1);
-    exported_moves
+    moves
+        .into_iter()
+        .map(|pos| {
+            char::from_u32(pos % size + 97).unwrap().to_string() + &(pos / size + 1).to_string()
+        })
+        .collect::<Vec<String>>()
+        .join(" ")
 }
 
 #[cfg(test)]
