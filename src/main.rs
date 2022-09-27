@@ -2,19 +2,33 @@ fn main() {
     println!("Hello, world!");
 }
 
-pub fn serialize_moves(moves: Vec<u32>, size: u32) -> String {
-    moves
-        .into_iter()
-        .map(|pos| {
-            char::from_u32(pos % size + 97).unwrap().to_string() + &(pos / size + 1).to_string()
-        })
-        .collect::<Vec<String>>()
-        .join(" ")
+pub struct Moves {
+    moves: Vec<u32>,
+    board_size: u32,
+}
+
+impl Moves {
+    pub fn new(moves: Vec<u32>, board_size: u32) -> Moves {
+        Moves { moves, board_size }
+    }
+
+    pub fn serialize(&self) -> String {
+        self.moves
+            .iter()
+            .map(|pos| {
+                char::from_u32(pos % self.board_size + 97)
+                    .unwrap()
+                    .to_string()
+                    + &(pos / self.board_size + 1).to_string()
+            })
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::serialize_moves;
+    use crate::Moves;
 
     #[test]
     fn it_works() {
@@ -23,17 +37,17 @@ mod tests {
     }
     #[test]
     fn should_return_a1() {
-        let moves = vec![0];
-        assert_eq!(serialize_moves(moves, 5), "a1")
+        let moves = Moves::new(vec![0], 5);
+        assert_eq!(moves.serialize(), "a1")
     }
     #[test]
     fn should_return_a1b1() {
-        let moves = vec![0, 1];
-        assert_eq!(serialize_moves(moves, 5), "a1 b1")
+        let moves = Moves::new(vec![0, 1], 5);
+        assert_eq!(moves.serialize(), "a1 b1")
     }
     #[test]
     fn should_return_a1a2() {
-        let moves = vec![0, 5];
-        assert_eq!(serialize_moves(moves, 5), "a1 a2")
+        let moves = Moves::new(vec![0, 5], 5);
+        assert_eq!(moves.serialize(), "a1 a2")
     }
 }
