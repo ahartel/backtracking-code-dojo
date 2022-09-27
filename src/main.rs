@@ -2,7 +2,7 @@ fn main() {
     println!("Hello, world!");
 }
 
-pub fn export_board(moves: Vec<u32>, size: u32) -> String {
+pub fn serialize_moves(moves: Vec<u32>, size: u32) -> String {
     let mut exported_moves = String::new();
     for m in moves {
         exported_moves.push(char::from_u32(m % size + 97).unwrap());
@@ -15,7 +15,7 @@ pub fn export_board(moves: Vec<u32>, size: u32) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::export_board;
+    use crate::serialize_moves;
 
     #[test]
     fn it_works() {
@@ -25,16 +25,16 @@ mod tests {
     #[test]
     fn should_return_a1() {
         let moves = vec![0];
-        assert_eq!(export_board(moves, 5), "a1")
+        assert_eq!(serialize_moves(moves, 5), "a1")
     }
     #[test]
     fn should_return_a1b1() {
         let moves = vec![0, 1];
-        assert_eq!(export_board(moves, 5), "a1 b1")
+        assert_eq!(serialize_moves(moves, 5), "a1 b1")
     }
     #[test]
     fn should_return_a1a2() {
         let moves = vec![0, 5];
-        assert_eq!(export_board(moves, 5), "a1 a2")
+        assert_eq!(serialize_moves(moves, 5), "a1 a2")
     }
 }
