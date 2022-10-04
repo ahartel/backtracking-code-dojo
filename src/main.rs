@@ -4,63 +4,42 @@ fn main() {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Position {
-    x: u32,
-    y: u32,
+    column: u32,
+    row: u32,
 }
 
 impl Position {
-    pub fn new(x: u32, y: u32) -> Position {
-        Position { x, y }
+    pub fn new(column: u32, row: u32) -> Position {
+        Position { column, row }
     }
 }
 
-/// Returns allowed moves from a given position
-pub struct AllowedPositions {
-    pub allowed_positions: Vec<Position>,
-    index: usize,
-}
+const MOVES: [(i32, i32); 8] = [
+    (-2, -1),
+    (2, -1),
+    (1, -2),
+    (-1, -2),
+    (-2, 1),
+    (2, 1),
+    (-1, 2),
+    (1, 2),
+];
 
-impl AllowedPositions {
-    pub fn new(current_position: Position, board_size: u32) -> AllowedPositions {
-        let possible_moves: Vec<(i32, i32)> = vec![
-            (-2, -1),
-            (2, -1),
-            (1, -2),
-            (-1, -2),
-            (-2, 1),
-            (2, 1),
-            (-1, 2),
-            (1, 2),
-        ];
-        let allowed_positions = possible_moves
-            .into_iter()
-            .map(|(x, y)| {
-                let new_x = current_position.x as i32 + x;
-                let new_y = current_position.y as i32 + y;
-                (new_x, new_y)
-            })
-            .filter(|&(x, y)| x >= 0 && y >= 0)
-            .map(|(x, y)| (x as u32, y as u32))
-            .filter(|&(x, y)| x < board_size && y < board_size)
-            .map(|(x, y)| Position::new(x as u32, y as u32))
-            .collect();
-        AllowedPositions {
-            allowed_positions,
-            index: 0,
-        }
-    }
-}
-
-impl Iterator for AllowedPositions {
-    type Item = Position;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let result = self.allowed_positions.get(self.index);
-        if result.is_some() {
-            self.index += 1;
-        }
-        result.copied()
-    }
+pub fn allowed_positions(
+    current_position: Position,
+    board_size: u32,
+) -> impl Iterator<Item = Position> {
+    MOVES
+        .iter()
+        .map(move |(x, y)| {
+            let new_x = current_position.column as i32 + x;
+            let new_y = current_position.row as i32 + y;
+            (new_x, new_y)
+        })
+        .filter(|&(x, y)| x >= 0 && y >= 0)
+        .map(|(x, y)| (x as u32, y as u32))
+        .filter(move |&(x, y)| x < board_size && y < board_size)
+        .map(|(x, y)| Position::new(x as u32, y as u32))
 }
 
 pub struct VisitedPositions {
@@ -77,15 +56,25 @@ impl VisitedPositions {
     pub fn serialize(&self) -> String {
         self.visited_positions
             .iter()
-            .map(|pos| char::from_u32(pos.x + 97).unwrap().to_string() + &(pos.y + 1).to_string())
+            .map(|pos| {
+                char::from_u32(pos.column + 'a' as u32).unwrap().to_string()
+                    + &(pos.row + 1).to_string()
+            })
             .collect::<Vec<String>>()
             .join(" ")
     }
 }
 
+pub fn find_solution_to_knights_tour_by_backtracking(
+    _starting_position: Position,
+    _board_size: u32,
+) -> Option<VisitedPositions> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{AllowedPositions, Position, VisitedPositions};
+    use crate::{allowed_positions, Position, VisitedPositions};
 
     #[test]
     fn it_works() {
@@ -111,21 +100,21 @@ mod tests {
     #[test]
     fn eight_allowed_positions_from_center() {
         let current = Position::new(2, 2);
-        let allowed_positions = AllowedPositions::new(current, 5);
+        let allowed_positions = allowed_positions(current, 5);
         assert_eq!(allowed_positions.count(), 8);
     }
 
     #[test]
     fn two_allowed_positions_from_top_left() {
         let current = Position::new(0, 0);
-        let allowed_positions = AllowedPositions::new(current, 5);
+        let allowed_positions = allowed_positions(current, 5);
         assert_eq!(allowed_positions.count(), 2);
     }
 
     #[test]
     fn two_allowed_positions_from_top_right() {
         let current = Position::new(4, 0);
-        let allowed_positions = AllowedPositions::new(current, 5);
+        let allowed_positions = allowed_positions(current, 5);
         assert_eq!(allowed_positions.count(), 2);
     }
 }
