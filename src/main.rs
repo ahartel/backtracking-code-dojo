@@ -1,5 +1,5 @@
 fn main() {
-    let starting_position = Position::new(4, 0);
+    let starting_position = Position::new(0, 0);
     let solutions = Solutions::new(starting_position, 8);
     // println!("{}", solutions.count());
     for journey in solutions.take(10) {
@@ -7,7 +7,7 @@ fn main() {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Position {
     column: u32,
     row: u32,
@@ -16,6 +16,10 @@ pub struct Position {
 impl Position {
     pub fn new(column: u32, row: u32) -> Position {
         Position { column, row }
+    }
+
+    pub fn as_idx(&self, board_size: usize) -> usize {
+        (self.column as usize) * board_size + (self.row as usize)
     }
 }
 
@@ -30,31 +34,24 @@ const MOVES: [(i32, i32); 8] = [
     (1, 2),
 ];
 
+#[derive(Clone)]
 pub struct Journey {
-    visited_positions: Vec<Position>,
+    moves: Vec<Position>,
+    visited: Vec<bool>,
+    board_size: usize,
 }
 
 impl Journey {
-    pub fn new(position: Position) -> Journey {
+    pub fn new(board_size: usize, start: Position) -> Journey {
         Journey {
-            visited_positions: vec![position],
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.visited_positions.len()
-    }
-
-    pub fn clone_and_push(&self, new_pos: Position) -> Journey {
-        let mut new = self.visited_positions.clone();
-        new.push(new_pos);
-        Journey {
-            visited_positions: new,
+            moves: vec![start],
+            visited: vec![false; board_size * board_size],
+            board_size,
         }
     }
 
     pub fn serialize(&self) -> String {
-        self.visited_positions
+        self.moves
             .iter()
             .map(|pos| {
                 char::from_u32(pos.column + 'a' as u32).unwrap().to_string()
@@ -64,18 +61,26 @@ impl Journey {
             .join(" ")
     }
 
-    pub fn is_complete(&self, board_size: u32) -> bool {
-        // (0..board_size)
-        //     .flat_map(|x| {
-        //         let x = x.clone();
-        //         (0..board_size).map(move |y| Position::new(x, y))
-        //     })
-        //     .all(|p| self.visited_positions.contains(&p))
-        self.visited_positions.len() == (board_size * board_size) as usize
+    pub fn is_complete(&self) -> bool {
+        self.moves.len() == self.visited.len()
     }
 
-    pub fn allowed_positions(&self, board_size: u32) -> Vec<Position> {
-        let current_position = self.visited_positions.last().unwrap();
+    pub fn apply_move(&mut self, pos: Position) {
+        self.moves.push(pos);
+        *self.visited.get_mut(pos.as_idx(self.board_size)).unwrap() = true;
+    }
+
+    pub fn undo(&mut self) {
+        if let Some(last_move) = self.moves.pop() {
+            *self
+                .visited
+                .get_mut(last_move.as_idx(self.board_size))
+                .unwrap() = false;
+        }
+    }
+
+    pub fn candidate_positions(&self) -> Vec<Position> {
+        let current_position = self.moves.last().unwrap().clone();
         MOVES
             .iter()
             .map(move |(x, y)| {
@@ -85,23 +90,26 @@ impl Journey {
             })
             .filter(|&(x, y)| x >= 0 && y >= 0)
             .map(|(x, y)| (x as u32, y as u32))
-            .filter(move |&(x, y)| x < board_size && y < board_size)
+            .filter(move |&(x, y)| (x as usize) < self.board_size && (y as usize) < self.board_size)
             .map(|(x, y)| Position::new(x as u32, y as u32))
-            .filter(move |p| !self.visited_positions.contains(p))
+            .filter(move |p| !self.visited[p.as_idx(self.board_size)])
             .collect()
     }
 }
 
 struct Solutions {
-    open: Vec<Journey>,
-    board_size: u32,
+    journey: Journey,
+    open: Vec<(i32, Position)>,
+    count: i32,
 }
 
 impl Solutions {
-    pub fn new(starting_position: Position, board_size: u32) -> Solutions {
+    pub fn new(starting_position: Position, board_size: usize) -> Solutions {
+        let journey = Journey::new(board_size, starting_position);
         Solutions {
-            open: vec![Journey::new(starting_position)],
-            board_size,
+            journey,
+            open: vec![(0, starting_position)],
+            count: 0,
         }
     }
 }
@@ -109,19 +117,33 @@ impl Solutions {
 impl Iterator for Solutions {
     type Item = Journey;
 
+    /// Algorithm:
+    /// There is only one journey, but there is a stack of iterators for potential next moves.
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(journey) = self.open.pop() {
-            if journey.is_complete(self.board_size) {
-                return Some(journey);
+        if self.open.is_empty() {
+            return None;
+        }
+
+        while let Some((count, next)) = self.open.pop() {
+            for _ in 0..(self.count - count + 1) {
+                self.journey.undo();
             }
-            journey
-                .allowed_positions(self.board_size)
+
+            self.journey.apply_move(next);
+            self.count = count;
+
+            if self.journey.is_complete() {
+                return Some(self.journey.clone());
+            }
+
+            self.journey
+                .candidate_positions()
                 .into_iter()
-                .for_each(|p| {
-                    let new = journey.clone_and_push(p);
-                    self.open.push(new);
+                .for_each(|pos| {
+                    self.open.push((count + 1, pos));
                 });
         }
+
         None
     }
 }
@@ -137,47 +159,50 @@ mod tests {
     }
     #[test]
     fn should_return_a1() {
-        let moves = Journey::new(Position::new(0, 0));
+        let moves = Journey::new(8, Position::new(0, 0));
         assert_eq!(moves.serialize(), "a1")
     }
     #[test]
     fn should_return_a1b1() {
-        let moves = Journey::new(Position::new(0, 0)).clone_and_push(Position::new(1, 0));
+        let mut moves = Journey::new(8, Position::new(0, 0));
+        moves.apply_move(Position::new(1, 0));
         assert_eq!(moves.serialize(), "a1 b1")
     }
     #[test]
     fn should_return_a1a2() {
-        let moves = Journey::new(Position::new(0, 0)).clone_and_push(Position::new(0, 1));
+        let mut moves = Journey::new(8, Position::new(0, 0));
+        moves.apply_move(Position::new(0, 1));
         assert_eq!(moves.serialize(), "a1 a2")
     }
 
     #[test]
     fn eight_allowed_positions_from_center() {
         let current = Position::new(2, 2);
-        let allowed_positions = Journey::new(current).allowed_positions(5);
-        assert_eq!(allowed_positions.count(), 8);
+        let allowed_positions = Journey::new(5, current).candidate_positions();
+        assert_eq!(allowed_positions.len(), 8);
     }
 
     #[test]
     fn two_allowed_positions_from_top_left() {
         let current = Position::new(0, 0);
-        let allowed_positions = Journey::new(current).allowed_positions(5);
-        assert_eq!(allowed_positions.count(), 2);
+        let allowed_positions = Journey::new(5, current).candidate_positions();
+        assert_eq!(allowed_positions.len(), 2);
     }
 
     #[test]
     fn two_allowed_positions_from_top_right() {
         let current = Position::new(4, 0);
-        let allowed_positions = Journey::new(current).allowed_positions(5);
-        assert_eq!(allowed_positions.count(), 2);
+        let journey = Journey::new(5, current);
+        let allowed_positions = journey.candidate_positions();
+        assert_eq!(allowed_positions.len(), 2);
     }
 
     #[test]
-    fn solution_has_64_positions() {
-        let solution = Solutions::new(Position { column: 0, row: 0 }, 8)
+    fn solution_has_25_positions() {
+        let solution = Solutions::new(Position { column: 0, row: 0 }, 5)
             .next()
             .unwrap();
-        assert_eq!(solution.len(), 64);
+        assert_eq!(solution.visited.len(), 25);
     }
 
     #[test]
@@ -189,7 +214,6 @@ mod tests {
                 (0..board_size).map(move |y| Position::new(x, y))
             })
             .collect();
-        println!("{:?}", all_pos);
         assert_eq!(all_pos.len(), (board_size * board_size) as usize);
     }
 }
